@@ -1,0 +1,136 @@
+---
+title: "Exponential Distribution Analysis"
+author: "Mike Wheelock"
+date: "March 2, 2017"
+output: pdf_document
+---
+
+```{r echo=FALSE}
+library("ggplot2")
+library("latex2exp")
+
+set.seed(42030217)
+
+lambda <- 0.2
+sigma <- 1 / lambda
+mean <- 1 / lambda
+variance <- 1 / lambda ^ 2
+n <- 40
+samples <- 1000
+sample_sigma = sigma / sqrt(n)
+
+bins <- 40
+
+x <- seq(0.05, 30, 0.05)
+y <- lambda + exp(-lambda * x)
+data <- data.frame(cbind(x=x, y=y))
+g <- ggplot(data, aes(x = x, y = y))
+g <- g + geom_point(size = 0.5)
+g <- g + ggtitle(TeX("$f(x; \\lambda) = \\lambda e^{-\\lambda x}; \\lambda = 0.2$"))
+g <- g + ylab(expression(f(x)))
+g <- g + theme(plot.title = element_text(hjust = 0.5))
+exponential_graph <- g
+
+bin_scale <- 8
+
+```
+
+```{r echo=FALSE}
+exponential_graph
+```
+
+## The Exponential Distribution
+The exponential distribution is a probability distribution that describes the time between events in a Poisson process. It's formula, mean and standard deviation are:  
+
+\(f(x; \lambda) = \lambda e^{-\lambda x}\)  
+  
+\(\mu = \frac{1}{\lambda}\)  
+  
+\(\sigma = \frac{1}{\lambda}\)  
+
+If a Poisson process is telling you how many people will show up at the bus stop in a particular window at a particular average rate, the exponential distribution will give you those random wait times. This project is about investigating this distribution and illustrating the Central Limit Theorem.
+
+## Procedure
+
+For the purposes of this exercise an exponential distribution with \(\lambda = 0.2\) was chosen.
+A set of 1000 groups of n = 40 values each was sampled, collected and analyzed. This was accomplished by creating a 1000 x 40 matrix of random variables from the exponential distribution (using the `rexp` function) and then collecting statistical measures over each row. Below is the code that accomplises this.
+
+```{r}
+# Set parameters
+lambda <- 0.2
+n <- 40
+samples <- 1000
+
+#Generate random variables
+exp_rands <- rexp(n * samples, rate = lambda)
+dim(exp_rands) <- c(samples, n)
+
+# Calculate statistical measures
+means <- apply(exp_rands, 1, mean)
+variances <- apply(exp_rands, 1, function(vec) { 
+    mu = mean(vec); 
+    sum((mu - vec)^2) / (length(vec) - 1) })
+sample_mean <- mean(means)
+sample_variance <- mean(variances)
+```
+```{r echo=FALSE}
+mean <- 1 / lambda
+variance <- 1 / lambda^2
+sample_mean_error <- abs((mean - sample_mean) * 100 / mean)
+sample_variance_error <- abs((variance - sample_variance) * 100 / variance)
+```
+
+## Results
+
+Below is a table summarizing the overall statistical measures calculated for the distribution:
+
+|           |  Sample             | Theoretical | Percent Error              |
+|:----------|:-------------------:|:-----------:|:--------------------------:|
+|   Mean    | `r sample_mean`     | 5           | `r sample_mean_error`%     |
+| Variance  | `r sample_variance` | 25          | `r sample_variance_error`% |
+
+Both the sample mean and sample variance overall were excellent estimators of the population mean and variance. It is clear from the figure below that the sample mean distribution is normally distributed. To help illustrate this I have overlaid a standard normal curve with a mean of 5 and a standards deviation of 5 on the graph. The red line is centered at x = 5, the population mean.
+  
+The second graph shows the distribution of the sample variance. As expected the variance is skewed to the right. The red line here is centered at the population variance of 25.
+
+```{r echo=FALSE}
+x <- seq(min(means), max(means), 0.01)
+y <- dnorm(x, mean = mean, sd = sample_sigma) / bin_scale
+normal_data <- data.frame(cbind(x=x, y=y))
+
+suppressWarnings( {
+    g <- ggplot(data.frame(x = means), aes(x = x))
+    g <- g + geom_bar(binwidth = 1 / bin_scale, color = "black", fill = "lightblue", aes(y = (..count..)/sum(..count..)))
+    g <- g + geom_point(data = normal_data, size = 0.5, aes(x = x, y = y))
+    g <- g + geom_vline(xintercept = 5, color="red", size = 1)
+    g <- g + labs(title = "Simulated sample means versus normal distribution", x = "mean", y = "frequency")
+} )
+sample_mean_graph <- g
+
+bin_scale <- 4
+
+x <- seq(min(variances), max(variances), 0.01)
+bin_width <- (max(x) - min(x)) / bins
+
+vx <- seq(2, 32, length.out = length(x))
+vy <- dchisq(vx, 10) * .7
+variance_data <- data.frame(x = x, y = vy)
+
+suppressWarnings( {
+    g <- ggplot(data.frame(x = variances), aes(x = x))
+    g <- g + geom_bar(binwidth = bin_width, color = "black", fill = "lightblue", aes(y = (..count..)/sum(..count..)))
+    g <- g + geom_point(data = variance_data, size = 0.5, aes(x = x, y = y))
+    g <- g + geom_vline(xintercept = 25, color="red", size = 1)
+    g <- g + labs(title = "Simulated sample variance", x = "variance", y = "frequency")
+} )
+
+sample_variance_graph <- g
+```
+
+```{r echo=FALSE}
+sample_mean_graph
+```
+
+```{r echo=FALSE}
+sample_variance_graph
+```
